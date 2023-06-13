@@ -1,5 +1,5 @@
 // Utils
-import { OpenAIStream, OpenAIStreamPayload } from "../../utils/OpenAIStream";
+import { QueryStream, QueryStreamPayload } from "../../utils/QueryStream";
 
 // Types
 // import type { Message, Query } from "../../types/schemas";
@@ -19,10 +19,6 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response("ok", { status: 200 });
   }
 
-  // Extract data
-  // const { prompt } = (await req.json()) as {
-  //   prompt?: string;
-  // };
   const query = await req.json();
   console.log(" - Chat Query -");
   console.log(query);
@@ -31,9 +27,6 @@ const handler = async (req: Request): Promise<Response> => {
   /*
    *  [1] Format Inquiry
    */
-
-  // Time function
-  const startTime = Date.now();
 
   // Setup personality
   let personality: ChatGPTMessage[] = [{
@@ -58,7 +51,7 @@ const handler = async (req: Request): Promise<Response> => {
   console.log("Query: ", formattedMessages);
 
   // Create response stream
-  const payload: OpenAIStreamPayload = {
+  const payload: QueryStreamPayload = {
     model: "gpt-3.5-turbo",
     messages: formattedMessages,
     temperature: 1.0,
@@ -70,7 +63,8 @@ const handler = async (req: Request): Promise<Response> => {
     // n: 1,
   };
 
-  const stream = await OpenAIStream(payload);
+  // Create query stream
+  const stream = await QueryStream(payload);
   // return stream response (SSE)
   return new Response(
     stream, {

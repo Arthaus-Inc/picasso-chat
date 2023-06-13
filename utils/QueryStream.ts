@@ -16,7 +16,7 @@ export interface ChatGPTMessage {
   type?: string
 }
 
-export interface OpenAIStreamPayload {
+export interface QueryStreamPayload {
   model: string;
   messages: ChatGPTMessage[];
   temperature: number;
@@ -28,7 +28,7 @@ export interface OpenAIStreamPayload {
   n: number;
 }
 
-export async function OpenAIStream(payload: OpenAIStreamPayload) {
+export async function QueryStream(payload: QueryStreamPayload) {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
 
