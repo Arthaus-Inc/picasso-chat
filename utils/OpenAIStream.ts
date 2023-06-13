@@ -69,6 +69,7 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
       // stream response (SSE) from OpenAI may be fragmented into multiple chunks
       // this ensures we properly read chunks and invoke an event for each SSE event stream
       const parser = createParser(onParse);
+
       // https://web.dev/streams/#asynchronous-iteration
       for await (const chunk of res.body as any) {
         parser.feed(decoder.decode(chunk));
@@ -83,6 +84,7 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
   let fullMessage = "";
   let totalMessages = 0;
   let lastToken = "";
+  let rewrite = false;
   const transformStream = new TransformStream({
     async transform(chunk, controller) {
       const data = decoder.decode(chunk);
@@ -104,6 +106,9 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
           return;
         }
 
+        // Create message ID index
+        let messageId = `msg-00000-${payload.messages.length.toString().padStart(4, '0')}`;
+
         // Add to sentence
         sentence += `${token}`;
         message += `${token}`;
@@ -113,7 +118,6 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
         lastToken = token;
 
         // Check if sentence
-        // if(counter > 2 && sentence.length > 3 && ".?!:".indexOf(token) >= 0) { // Emit sentence
         if(counter > 2 && sentence.length > 3 && (
           token.indexOf(".") >= 0 || token.indexOf("?") >= 0 ||
           token.indexOf("!") >= 0 || token.indexOf(":") >= 0
@@ -122,13 +126,37 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
           if(totalMessages < 1 && message != "") {
             console.log(` -- [${totalMessages} | ${token.replaceAll("\n", "")}] new sentence:`, sentence.trim());
 
-            // stream transformed JSON resposne as SSE
-            const payload = { sentence: sentence.trim() };
+            // // stream transformed JSON resposne as SSE
+            // const payload = { sentence: sentence.trim() };
+            //
+            // // https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
+            // controller.enqueue(
+            //   encoder.encode(`${JSON.stringify(payload)}\n`)
+            // );
 
-            // https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
-            controller.enqueue(
-              encoder.encode(`${JSON.stringify(payload)}\n`)
-            );
+            // Determine if need to rewrite
+            if((sentences.length > 4 || message.length > 300) && !rewrite) {
+              console.log(" --> Requires re-write:");
+
+              // Set rewrite flag
+              rewrite = true;
+
+              // Send initial response sentence to UI
+              const responsePayload = {
+                id: `${messageId}-000`,
+                type: "response",
+                role: "assistant",
+                data: {
+                  display: true
+                },
+                content: sentences[0].trim()
+              };
+
+              // https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
+              controller.enqueue(
+                encoder.encode(`${JSON.stringify(responsePayload)}\n`)
+              );
+            }
           }
 
           // Add to messages
@@ -140,40 +168,42 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
 
         // Clear message (and at least a few tokens in)
         if(counter > 2 && token.indexOf("\n") >= 0) {
-
-
-          // Do something with message
-          // if(message != "") {
-          //   console.log("=====");
-          //   console.log(message);
-          //   console.log("=====");
-          //   console.log("\n");
-          //
-          //   // Increment messages (only if has data)
-          //   totalMessages += 1;
-          // }
-
-          // console.log("\n=====");
-          // console.log(message);
-          // console.log("=====\n");
-
           // Increment messages (only if has data)
-          // if(message.length )
           totalMessages += 1;
 
           // Emit sentences early
-          if(totalMessages >= 1 && message.length > 3) {
-            console.log(` -- [${totalMessages}] new message:`, message.replaceAll("\n", ""));
-
-            // stream transformed JSON resposne as SSE
-            const payload = {
-              message: message,
-              sentences: sentences.length
+          if(totalMessages == 1 && rewrite) {
+            // Send initial response sentence to UI
+            const responsePayload = {
+              id: `${messageId}-000`,
+              type: "response",
+              action: "update",
+              data: {
+                query: message.replaceAll("\n", "")
+              }
             };
 
-            // https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
+            // Stream response payload to browser
             controller.enqueue(
-              encoder.encode(`${JSON.stringify(payload)}\n`)
+              encoder.encode(`${JSON.stringify(responsePayload)}\n`)
+            );
+          } else if(totalMessages >= 1 && message.length > 3 && !rewrite) {
+            console.log(` -- [${totalMessages}] new message:`, message.replaceAll("\n", ""));
+
+            // Send initial response sentence to UI
+            const responsePayload = {
+              id: `${messageId}-${(totalMessages-1).toString().padStart(3, '0')}`,
+              type: "response",
+              role: "assistant",
+              data: {
+                display: true
+              },
+              content: message.replaceAll("\n", "")
+            };
+
+            // Stream response payload to browser
+            controller.enqueue(
+              encoder.encode(`${JSON.stringify(responsePayload)}\n`)
             );
           }
 
