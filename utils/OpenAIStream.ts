@@ -5,11 +5,8 @@ import {
   ReconnectInterval,
 } from "eventsource-parser";
 
-// Wink NLP
-// const winkNLP = require( 'wink-nlp' );
-// import winkNLP from 'wink-nlp';
-// const model = require( 'wink-eng-lite-web-model' );
-// const nlp = winkNLP( model );
+// String template
+import format from "string-template";
 
 export type ChatGPTAgent = "user" | "system";
 
@@ -188,23 +185,49 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
               encoder.encode(`${JSON.stringify(responsePayload)}\n`)
             );
           } else if(totalMessages >= 1 && message.length > 3 && !rewrite) {
-            console.log(` -- [${totalMessages}] new message:`, message.replaceAll("\n", ""));
+            // Format message
+            let formattedMessage = message.replaceAll("\n", "");
+            console.log(` -- [${totalMessages}] new message:`, formattedMessage);
+
+            // Extract message data format
+            let namedEntity = formattedMessage.match(/\{(.*?)\}/);
+
+            // Determine message type (response or threaded)
+            let messageType = (totalMessages == 1 || (totalMessages > 1 && namedEntity)) ? "response" : "thread";
 
             // Send initial response sentence to UI
-            const responsePayload = {
-              id: `${messageId}-${(totalMessages-1).toString().padStart(3, '0')}`,
-              type: "response",
-              role: "assistant",
-              data: {
-                display: true
-              },
-              content: message.replaceAll("\n", "")
-            };
+            if(messageType == "thread") {
+              // Parse entity
+              let entityParts = namedEntity[1].split("|");
 
-            // Stream response payload to browser
-            controller.enqueue(
-              encoder.encode(`${JSON.stringify(responsePayload)}\n`)
-            );
+              // Determine list item type
+              let listItemType = "recommendation.style.list-item";
+              if(entityParts[1].toLowerCase() == "artist") {
+                listItemType = "recommendation.artist.list-item";
+              }
+              if(entityParts[1].toLowerCase() == "artwork") {
+                listItemType = "recommendation.artwork.list-item";
+              }
+
+              // Update formatted message
+              formattedMessage = formattedMessage.replace(namedEntity[0], entityParts[0]);
+            } else {
+              // Send as-is
+              const responsePayload = {
+                id: `${messageId}-${(totalMessages-1).toString().padStart(3, '0')}`,
+                type: messageType,
+                role: "assistant",
+                data: {
+                  display: true
+                },
+                content: formattedMessage
+              };
+
+              // Stream response payload to browser
+              controller.enqueue(
+                encoder.encode(`${JSON.stringify(responsePayload)}\n`)
+              );
+            }
           }
 
           // Reset message
