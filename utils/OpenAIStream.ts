@@ -124,14 +124,6 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
           if(totalMessages < 1 && message != "") {
             console.log(` -- [${totalMessages} | ${token.replaceAll("\n", "")}] new sentence:`, sentence.trim());
 
-            // // stream transformed JSON resposne as SSE
-            // const payload = { sentence: sentence.trim() };
-            //
-            // // https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
-            // controller.enqueue(
-            //   encoder.encode(`${JSON.stringify(payload)}\n`)
-            // );
-
             // Determine if need to rewrite
             if((sentences.length > 4 || message.length > 300) && !rewrite) {
               console.log(" --> Requires re-write:");
@@ -150,10 +142,39 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
                 content: sentences[0].trim()
               };
 
-              // https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events#event_stream_format
-              controller.enqueue(
-                encoder.encode(`${JSON.stringify(responsePayload)}\n`)
-              );
+              // Determine if there are any questions in the response
+              let questionPayload = null;
+              for (var i = 1; i < sentences.length; i++) {
+                // Check sentence
+                if(sentences[i].indexOf("?") >= 0 || sentences[i].indexOf("!") >= 0) {
+                  // Set question payload
+                  questionPayload = {
+                    id: `${messageId}-001`,
+                    type: "response",
+                    role: "assistant",
+                    data: {
+                      display: true
+                    },
+                    content: sentences[i].trim()
+                  };
+
+                  // Finish
+                  break;
+                }
+              }
+
+              // Add response
+              if(questionPayload) {
+                // Send resposne and question
+                controller.enqueue(
+                  encoder.encode(`${JSON.stringify([responsePayload, questionPayload])}\n`)
+                );
+              } else {
+                // Just send first sentence
+                controller.enqueue(
+                  encoder.encode(`${JSON.stringify([responsePayload])}\n`)
+                );
+              }
             }
           }
 
@@ -170,7 +191,7 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
           totalMessages += 1;
 
           // Set context
-          context = (sentences.length > 0) ? sentences[0].trim() : "";
+          context = (context != "" && sentences.length > 0) ? sentences[0].trim() : "";
 
           // Emit sentences early
           if(totalMessages == 1 && rewrite) {
@@ -186,7 +207,7 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
 
             // Stream response payload to browser
             controller.enqueue(
-              encoder.encode(`${JSON.stringify(responsePayload)}\n`)
+              encoder.encode(`${JSON.stringify([responsePayload])}\n`)
             );
           } else if(totalMessages >= 1 && message.length > 3 && !rewrite) {
             // Format message
@@ -207,15 +228,32 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
 
               // Determine list item type
               let listItemType = "recommendation.style.list-item";
-              if(entityParts[1].toLowerCase() == "artist") {
+
+              // [1] Type keywords
+              if(entityParts.length > 1 && entityParts[1].toLowerCase() == "artist") {
                 listItemType = "recommendation.artist.list-item";
               }
-              if(entityParts[1].toLowerCase() == "artwork") {
+              if(entityParts.length > 1 && entityParts[1].toLowerCase() == "artwork") {
                 listItemType = "recommendation.artwork.list-item";
               }
 
-              // Update formatted message
+              // [2] Artwork lookup
+              let entityPos = formattedMessage.indexOf(namedEntity[0]);
+              let byPos = formattedMessage.indexOf(" by ");
+              if(byPos > 0 && (byPos - (entityPos + namedEntity[0].length)) < 3) {
+                listItemType = "recommendation.artwork.list-item";
+              }
+
+              // Clean message
               formattedMessage = formattedMessage.replace(namedEntity[0], entityParts[0]);
+
+              // Format query
+              let query = formattedMessage.replace(namedEntity[0], entityParts[0]);
+
+              // Clean query (numbers)
+              if(query.charAt(1) == '.') {
+                query = query.slice(3);
+              }
 
               // Format response
               const responsePayload = {
@@ -225,11 +263,11 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
                 data: {
                   display: false,
                   intent: listItemType,
-                  query: formattedMessage,
+                  query: query,
                   context: context,
                   target: `${messageId}-${(totalMessages-1).toString().padStart(3, '0')}-a`
                 },
-                content: ""
+                content: formattedMessage
               };
 
               // Create products placeholder
