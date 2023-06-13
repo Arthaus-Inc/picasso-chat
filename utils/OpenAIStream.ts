@@ -79,6 +79,7 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
   let sentences = [];
   let message = "";
   let fullMessage = "";
+  let context = "";
   let totalMessages = 0;
   let lastToken = "";
   let rewrite = false;
@@ -168,6 +169,9 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
           // Increment messages (only if has data)
           totalMessages += 1;
 
+          // Set context
+          context = (sentences.length > 0) ? sentences[0].trim() : "";
+
           // Emit sentences early
           if(totalMessages == 1 && rewrite) {
             // Send initial response sentence to UI
@@ -191,9 +195,10 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
 
             // Extract message data format
             let namedEntity = formattedMessage.match(/\{(.*?)\}/);
+            console.log(" ---> Named Entity: ", namedEntity);
 
             // Determine message type (response or threaded)
-            let messageType = (totalMessages == 1 || (totalMessages > 1 && namedEntity)) ? "response" : "thread";
+            let messageType = (totalMessages == 1 || (totalMessages > 1 && !namedEntity)) ? "response" : "thread";
 
             // Send initial response sentence to UI
             if(messageType == "thread") {
@@ -211,6 +216,37 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
 
               // Update formatted message
               formattedMessage = formattedMessage.replace(namedEntity[0], entityParts[0]);
+
+              // Format response
+              const responsePayload = {
+                id: `${messageId}-${(totalMessages-1).toString().padStart(3, '0')}`,
+                type: messageType,
+                role: "assistant",
+                data: {
+                  display: false,
+                  intent: listItemType,
+                  query: formattedMessage,
+                  context: context,
+                  target: `${messageId}-${(totalMessages-1).toString().padStart(3, '0')}-a`
+                },
+                content: ""
+              };
+
+              // Create products placeholder
+              const productsPayload = {
+                id: `${messageId}-${(totalMessages-1).toString().padStart(3, '0')}-a`,
+                type: "products",
+                role: "assistant",
+                data: {
+                  display: false
+                },
+                content: ""
+              };
+
+              // Stream response payload to browser
+              controller.enqueue(
+                encoder.encode(`${JSON.stringify([responsePayload, productsPayload])}\n`)
+              );
             } else {
               // Send as-is
               const responsePayload = {
@@ -218,14 +254,14 @@ export async function OpenAIStream(payload: OpenAIStreamPayload) {
                 type: messageType,
                 role: "assistant",
                 data: {
-                  display: true
+                  display: false
                 },
                 content: formattedMessage
               };
 
               // Stream response payload to browser
               controller.enqueue(
-                encoder.encode(`${JSON.stringify(responsePayload)}\n`)
+                encoder.encode(`${JSON.stringify([responsePayload])}\n`)
               );
             }
           }
