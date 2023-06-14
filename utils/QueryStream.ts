@@ -147,13 +147,16 @@ export async function QueryStream(payload: QueryStreamPayload) {
               for (var i = 1; i < sentences.length; i++) {
                 // Check sentence
                 if(sentences[i].indexOf("?") >= 0 || sentences[i].indexOf("!") >= 0) {
+                  // Increment message ID
+                  //messageId = `msg-00000-${(payload.messages.length + 1).toString().padStart(4, '0')}`;
+
                   // Set question payload
                   questionPayload = {
                     id: `${messageId}-001`,
                     type: "response",
                     role: "assistant",
                     data: {
-                      display: true
+                      display: false
                     },
                     content: sentences[i].trim()
                   };
@@ -163,18 +166,27 @@ export async function QueryStream(payload: QueryStreamPayload) {
                 }
               }
 
-              // Add response
-              if(questionPayload) {
-                // Send resposne and question
-                controller.enqueue(
-                  encoder.encode(`${JSON.stringify([responsePayload, questionPayload])}\n`)
-                );
-              } else {
-                // Just send first sentence
-                controller.enqueue(
-                  encoder.encode(`${JSON.stringify([responsePayload])}\n`)
-                );
+              // Add follow-up
+              if(!questionPayload) {
+                // Increment message ID
+                //messageId = `msg-00000-${(payload.messages.length + 1).toString().padStart(4, '0')}`;
+
+                // Set question payload
+                questionPayload = {
+                  id: `${messageId}-001`,
+                  type: "response",
+                  role: "assistant",
+                  data: {
+                    display: false
+                  },
+                  content: "Would you like me to make some specific recommendations from our independent artist community?"
+                };
               }
+
+              // Send resposne and question
+              controller.enqueue(
+                encoder.encode(`${JSON.stringify([responsePayload, questionPayload])}\n`)
+              );
             }
           }
 
@@ -196,19 +208,19 @@ export async function QueryStream(payload: QueryStreamPayload) {
           // Emit sentences early
           if(totalMessages == 1 && rewrite) {
             // Send initial response sentence to UI
-            const responsePayload = {
-              id: `${messageId}-000`,
-              type: "response",
-              action: "update",
-              data: {
-                query: message.replaceAll("\n", "")
-              }
-            };
-
-            // Stream response payload to browser
-            controller.enqueue(
-              encoder.encode(`${JSON.stringify([responsePayload])}\n`)
-            );
+            // const responsePayload = {
+            //   id: `${messageId}-000`,
+            //   type: "response",
+            //   action: "update",
+            //   data: {
+            //     query: message.replaceAll("\n", "")
+            //   }
+            // };
+            //
+            // // Stream response payload to browser
+            // controller.enqueue(
+            //   encoder.encode(`${JSON.stringify([responsePayload])}\n`)
+            // );
           } else if(totalMessages >= 1 && message.length > 3 && !rewrite) {
             // Format message
             let formattedMessage = message.replaceAll("\n", "");
@@ -221,38 +233,47 @@ export async function QueryStream(payload: QueryStreamPayload) {
             // Determine message type (response or threaded)
             let messageType = (totalMessages == 1 || (totalMessages > 1 && !namedEntity)) ? "response" : "thread";
 
+            // Clean message
+            formattedMessage = formattedMessage.replace(namedEntity[0], entityParts[0]);
+
             // Send initial response sentence to UI
             if(messageType == "thread") {
               // Parse entity
               let entityParts = namedEntity[1].split("|");
 
-              // Determine list item type
-              let listItemType = "recommendation.style.list-item";
-
-              // [1] Type keywords
-              if(entityParts.length > 1 && entityParts[1].toLowerCase() == "artist") {
-                listItemType = "recommendation.artist.list-item";
-              }
-              if(entityParts.length > 1 && entityParts[1].toLowerCase() == "artwork") {
-                listItemType = "recommendation.artwork.list-item";
-              }
-
-              // [2] Artwork lookup
-              let entityPos = formattedMessage.indexOf(namedEntity[0]);
-              let byPos = formattedMessage.indexOf(" by ");
-              if(byPos > 0 && (byPos - (entityPos + namedEntity[0].length)) < 3) {
-                listItemType = "recommendation.artwork.list-item";
-              }
-
-              // Clean message
-              formattedMessage = formattedMessage.replace(namedEntity[0], entityParts[0]);
-
               // Format query
               let query = formattedMessage.replace(namedEntity[0], entityParts[0]);
+
+              // Determine list item type
+              let listItemType = "recommendation.style.list-item";
 
               // Clean query (numbers)
               if(query.charAt(1) == '.') {
                 query = query.slice(3);
+              }
+
+              // [1] Type keywords
+              if(entityParts.length > 1 && entityParts[1].toLowerCase() == "artist") {
+                listItemType = "recommendation.artist.list-item";
+
+                // Clean query ('#. ___: ')
+                let colonPos = query.indexOf(": ");
+                if(query.charAt(1) == '.' && colonPos > 0) {
+                  query = query.slice(colonPos + 2);
+                }
+              }
+              if(entityParts.length > 1 && entityParts[1].toLowerCase() == "artwork") {
+                listItemType = "recommendation.artwork.list-item";
+
+                // Clean query (' by ___ - ')
+                let hyphenPos = query.indexOf("- ");
+                if(hyphenPos < 0) {
+                  hyphenPos = query.indexOf(": ");
+                }
+                let byPos = query.indexOf(" by ");
+                if(hyphenPos > 0 && byPos > 0 && byPos < hyphenPos) {
+                  query = query.slice(hyphenPos + 3);
+                }
               }
 
               // Format response
