@@ -243,30 +243,35 @@ export async function QueryStream(payload: QueryStreamPayload) {
             console.log(` -- [${totalMessages}] new message:`, formattedMessage);
 
             // Extract message data format
-            let namedEntity = formattedMessage.match(/\{(.*?)\}/);
-            console.log(" ---> Named Entity: ", namedEntity);
+            let namedEntities = formattedMessage.match(/\{(.*?)\}/g);
+            console.log(" ---> Named Entities: ", namedEntities);
 
             // Determine message type (response or threaded)
-            let messageType = (isListItem(formattedMessage) || (totalMessages > 1 && namedEntity)) ? "thread" : "response";
-            console.log((totalMessages > 1 && namedEntity));
+            let messageType = (isListItem(formattedMessage) || (totalMessages > 1 && namedEntities && namedEntities.length > 0)) ? "thread" : "response";
             console.log("Is List Item: ", isListItem(formattedMessage));
             console.log("Message Type: ", messageType);
 
+            // Parse initial entity
+            let namedEntity = null;
+            let entityParts = null;
+
+            // Clean message
+            if(namedEntities && namedEntities.length > 0) {
+              // Iterate over all extracted entities
+              for(var i = 0; i < namedEntities.length; i++) {
+                // Extract named entity
+                namedEntity = namedEntities[i].match(/\{(.*?)\}/);
+
+                // Parse
+                entityParts = namedEntity ? namedEntity[1].split("|") : namedEntities[i].replace("{","").replace("}","");
+
+                // Format message
+                formattedMessage = formattedMessage.replace(namedEntities[i], entityParts[0]);
+              }
+            }
+
             // Send initial response sentence to UI
             if(messageType == "thread") {
-              // Parse entity
-              let entityParts = (namedEntity && namedEntity.length > 1) ? namedEntity[1].split("|") : null;
-              if(namedEntity && !entityParts) {
-                // in case no split
-                entityParts = [namedEntity[1]];
-              }
-
-
-              // Clean message
-              if(namedEntity && namedEntity.length > 0 && entityParts && entityParts.length > 0) {
-                  formattedMessage = formattedMessage.replace(namedEntity[0], entityParts[0]);
-              }
-
               // Format query
               let query = formattedMessage;
 
@@ -279,7 +284,7 @@ export async function QueryStream(payload: QueryStreamPayload) {
               }
 
               // [1] Check for Artist
-              if(entityParts && entityParts.length > 1 && entityParts[1].toLowerCase() == "artist") {
+              if(entityParts && entityParts.length > 1 && entityParts[1].toLowerCase().indexOf("artist") >= 0) {
                 listItemType = "recommendation.artist.list-item";
 
                 // Clean query ('#. ___: ')
@@ -290,7 +295,7 @@ export async function QueryStream(payload: QueryStreamPayload) {
               }
 
               // [2] Check for Artwork
-              if(entityParts && entityParts && entityParts.length > 1 && entityParts[1].toLowerCase() == "artwork") {
+              if(entityParts && entityParts && entityParts.length > 1 && entityParts[1].toLowerCase().indexOf("artwork") >= 0) {
                 listItemType = "recommendation.artwork.list-item";
 
                 // Clean query (' by ___ - ')
