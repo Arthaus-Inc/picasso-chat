@@ -255,7 +255,12 @@ export async function QueryStream(payload: QueryStreamPayload) {
             // Send initial response sentence to UI
             if(messageType == "thread") {
               // Parse entity
-              let entityParts = (namedEntity && namedEntity.length > 1) ? namedEntity[1].split("|") : [namedEntity[0]];
+              let entityParts = (namedEntity && namedEntity.length > 1) ? namedEntity[1].split("|") : null;
+              if(namedEntity && !entityParts) {
+                // in case no split
+                entityParts = [namedEntity[1]];
+              }
+
 
               // Clean message
               if(namedEntity && namedEntity.length > 0 && entityParts && entityParts.length > 0) {
