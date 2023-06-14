@@ -201,7 +201,7 @@ export async function QueryStream(payload: QueryStreamPayload) {
 
               // Send resposne and question
               controller.enqueue(
-                encoder.encode(`${JSON.stringify([responsePayload, questionPayload])}\n`)
+                encoder.encode(`${JSON.stringify([responsePayload, questionPayload])}||\n`)
               );
             }
           }
@@ -247,12 +247,15 @@ export async function QueryStream(payload: QueryStreamPayload) {
             console.log(" ---> Named Entity: ", namedEntity);
 
             // Determine message type (response or threaded)
-            let messageType = (totalMessages == 1 || !isListItem(formattedMessage) || (totalMessages > 1 && !namedEntity)) ? "response" : "thread";
+            let messageType = (isListItem(formattedMessage) || (totalMessages > 1 && namedEntity)) ? "thread" : "response";
+            console.log((totalMessages > 1 && namedEntity));
+            console.log("Is List Item: ", isListItem(formattedMessage));
+            console.log("Message Type: ", messageType);
 
             // Send initial response sentence to UI
             if(messageType == "thread") {
               // Parse entity
-              let entityParts = (namedEntity && namedEntity.length > 1) ? namedEntity[1].split("|") : null;
+              let entityParts = (namedEntity && namedEntity.length > 1) ? namedEntity[1].split("|") : [namedEntity[0]];
 
               // Clean message
               if(namedEntity && namedEntity.length > 0 && entityParts && entityParts.length > 0) {
@@ -330,7 +333,7 @@ export async function QueryStream(payload: QueryStreamPayload) {
 
               // Stream response payload to browser
               controller.enqueue(
-                encoder.encode(`${JSON.stringify([responsePayload, productsPayload])}\n`)
+                encoder.encode(`${JSON.stringify([responsePayload, productsPayload])}||\n`)
               );
             } else {
               // Send as-is
@@ -346,7 +349,7 @@ export async function QueryStream(payload: QueryStreamPayload) {
 
               // Stream response payload to browser
               controller.enqueue(
-                encoder.encode(`${JSON.stringify([responsePayload])}\n`)
+                encoder.encode(`${JSON.stringify([responsePayload])}||\n`)
               );
             }
           }

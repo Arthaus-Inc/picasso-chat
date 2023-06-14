@@ -123,7 +123,7 @@ export async function TopicsStream(payload: TopicsStreamPayload) {
 
             // Send to browser
             controller.enqueue(
-              encoder.encode(`${JSON.stringify([topicPayload])}\n`)
+              encoder.encode(`${JSON.stringify([topicPayload])}||\n`)
             );
           }
 
