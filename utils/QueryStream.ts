@@ -28,6 +28,11 @@ export interface QueryStreamPayload {
   n: number;
 }
 
+// Feature function - is list
+function isListItem(_string) {
+  return /^\d|-/.test( _string);
+}
+
 export async function QueryStream(payload: QueryStreamPayload) {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
@@ -177,7 +182,21 @@ export async function QueryStream(payload: QueryStreamPayload) {
                   type: "response",
                   role: "assistant",
                   data: {
-                    display: false
+                    display: false,
+                    topics: [
+                      {
+                        id: -2,
+                        query: "Yes, please recommend specific artworks.",
+                        topic: "suggest artworks",
+                        selected: false
+                      },
+                      {
+                        id: -1,
+                        query: "Can you show me some relevant artists?",
+                        topic: "suggest artists",
+                        selected: false
+                      }
+                    ]
                   },
                   content: "Would you like me to make some specific recommendations from our independent artist community?"
                 };
@@ -231,18 +250,20 @@ export async function QueryStream(payload: QueryStreamPayload) {
             console.log(" ---> Named Entity: ", namedEntity);
 
             // Determine message type (response or threaded)
-            let messageType = (totalMessages == 1 || (totalMessages > 1 && !namedEntity)) ? "response" : "thread";
-
-            // Clean message
-            formattedMessage = formattedMessage.replace(namedEntity[0], entityParts[0]);
+            let messageType = (totalMessages == 1 || !isListItem(formattedMessage) || (totalMessages > 1 && !namedEntity)) ? "response" : "thread";
 
             // Send initial response sentence to UI
             if(messageType == "thread") {
               // Parse entity
               let entityParts = namedEntity[1].split("|");
 
+              // Clean message
+              if(namedEntity && namedEntity.length > 0) {
+                  formattedMessage = formattedMessage.replace(namedEntity[0], entityParts[0]);
+              }
+
               // Format query
-              let query = formattedMessage.replace(namedEntity[0], entityParts[0]);
+              let query = formattedMessage;
 
               // Determine list item type
               let listItemType = "recommendation.style.list-item";
@@ -252,7 +273,7 @@ export async function QueryStream(payload: QueryStreamPayload) {
                 query = query.slice(3);
               }
 
-              // [1] Type keywords
+              // [1] Check for Artist
               if(entityParts.length > 1 && entityParts[1].toLowerCase() == "artist") {
                 listItemType = "recommendation.artist.list-item";
 
@@ -262,6 +283,8 @@ export async function QueryStream(payload: QueryStreamPayload) {
                   query = query.slice(colonPos + 2);
                 }
               }
+
+              // [2] Check for Artwork
               if(entityParts.length > 1 && entityParts[1].toLowerCase() == "artwork") {
                 listItemType = "recommendation.artwork.list-item";
 
@@ -274,6 +297,12 @@ export async function QueryStream(payload: QueryStreamPayload) {
                 if(hyphenPos > 0 && byPos > 0 && byPos < hyphenPos) {
                   query = query.slice(hyphenPos + 3);
                 }
+              }
+
+              // Fail-safe - add "disclaimer"
+              if(listItemType == "recommendation.style.list-item") {
+                // Add to message
+                formattedMessage += " Here are a pieces with similar style from our community:"
               }
 
               // Format response

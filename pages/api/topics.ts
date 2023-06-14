@@ -20,9 +20,9 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   const query = await req.json();
-  console.log(" - Chat Query -");
-  console.log(query);
-  console.log("\n");
+  // console.log(" - Chat Query -");
+  // console.log(query);
+  // console.log("\n");
 
   /*
    *  [1] Format Inquiry
@@ -36,7 +36,6 @@ const handler = async (req: Request): Promise<Response> => {
 
   // Construct API message context
   const messages: ChatGPTMessage[] = [...personality, ...query.messages];
-  console.log("Messages: ", messages);
 
   // Format messages
   let formattedMessages: ChatGPTMessage[] = [];
