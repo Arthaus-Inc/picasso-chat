@@ -5,9 +5,6 @@ import {
   ReconnectInterval,
 } from "eventsource-parser";
 
-// String template
-import format from "string-template";
-
 export type ChatGPTAgent = "user" | "system";
 
 export interface ChatGPTMessage {
@@ -25,11 +22,11 @@ export interface QueryStreamPayload {
   presence_penalty: number;
   max_tokens: number;
   stream: boolean;
-  n: number;
+  // n: number;
 }
 
 // Feature function - is list
-function isListItem(_string) {
+function isListItem(_string: string): boolean {
   return /^\d|-/.test( _string);
 }
 
@@ -81,7 +78,7 @@ export async function QueryStream(payload: QueryStreamPayload) {
 
   let counter = 0;
   let sentence = "";
-  let sentences = [];
+  let sentences: string[] = [];
   let message = "";
   let fullMessage = "";
   let context = "";
@@ -255,10 +252,10 @@ export async function QueryStream(payload: QueryStreamPayload) {
             // Send initial response sentence to UI
             if(messageType == "thread") {
               // Parse entity
-              let entityParts = namedEntity[1].split("|");
+              let entityParts = (namedEntity && namedEntity.length > 1) ? namedEntity[1].split("|") : null;
 
               // Clean message
-              if(namedEntity && namedEntity.length > 0) {
+              if(namedEntity && namedEntity.length > 0 && entityParts && entityParts.length > 0) {
                   formattedMessage = formattedMessage.replace(namedEntity[0], entityParts[0]);
               }
 
@@ -274,7 +271,7 @@ export async function QueryStream(payload: QueryStreamPayload) {
               }
 
               // [1] Check for Artist
-              if(entityParts.length > 1 && entityParts[1].toLowerCase() == "artist") {
+              if(entityParts && entityParts.length > 1 && entityParts[1].toLowerCase() == "artist") {
                 listItemType = "recommendation.artist.list-item";
 
                 // Clean query ('#. ___: ')
@@ -285,7 +282,7 @@ export async function QueryStream(payload: QueryStreamPayload) {
               }
 
               // [2] Check for Artwork
-              if(entityParts.length > 1 && entityParts[1].toLowerCase() == "artwork") {
+              if(entityParts && entityParts && entityParts.length > 1 && entityParts[1].toLowerCase() == "artwork") {
                 listItemType = "recommendation.artwork.list-item";
 
                 // Clean query (' by ___ - ')

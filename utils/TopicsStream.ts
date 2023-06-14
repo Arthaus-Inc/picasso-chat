@@ -5,9 +5,6 @@ import {
   ReconnectInterval,
 } from "eventsource-parser";
 
-// String template
-import format from "string-template";
-
 export type ChatGPTAgent = "user" | "system";
 
 export interface ChatGPTMessage {
@@ -25,7 +22,7 @@ export interface TopicsStreamPayload {
   presence_penalty: number;
   max_tokens: number;
   stream: boolean;
-  n: number;
+  // n: number;
 }
 
 export async function TopicsStream(payload: TopicsStreamPayload) {

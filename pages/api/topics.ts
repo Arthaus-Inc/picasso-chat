@@ -3,7 +3,7 @@ import { TopicsStream, TopicsStreamPayload } from "../../utils/TopicsStream";
 
 // Types
 // import type { Message, Query } from "../../types/schemas";
-import type { ChatGPTAgent, ChatGPTMessage } from "../../utils/OpenAIStream";
+import type { ChatGPTAgent, ChatGPTMessage } from "../../utils/TopicsStream";
 
 if (!process.env.OPENAI_API_KEY) {
   throw new Error("Missing env var from OpenAI");
