@@ -133,6 +133,32 @@ export async function QueryStream(payload: QueryStreamPayload) {
               // Set rewrite flag
               rewrite = true;
 
+              // Clean message
+              let formattedMessage = sentences[0].trim();
+
+              // Extract message data format
+              let namedEntities = formattedMessage.match(/\{(.*?)\}/g);
+              console.log(" ---> Named Entities: ", namedEntities);
+
+              // Parse initial entity
+              let namedEntity = null;
+              let entityParts = null;
+
+              // Clean message
+              if(namedEntities && namedEntities.length > 0) {
+                // Iterate over all extracted entities
+                for(var i = 0; i < namedEntities.length; i++) {
+                  // Extract named entity
+                  namedEntity = namedEntities[i].match(/\{(.*?)\}/);
+
+                  // Parse
+                  entityParts = namedEntity ? namedEntity[1].split("|") : namedEntities[i].replace("{","").replace("}","");
+
+                  // Format message
+                  formattedMessage = formattedMessage.replace(namedEntities[i], entityParts[0]);
+                }
+              }
+
               // Send initial response sentence to UI
               const responsePayload = {
                 id: `${messageId}-000`,
@@ -201,7 +227,7 @@ export async function QueryStream(payload: QueryStreamPayload) {
 
               // Send resposne and question
               controller.enqueue(
-                encoder.encode(`${JSON.stringify([responsePayload, questionPayload])}||\n`)
+                encoder.encode(`${JSON.stringify([responsePayload, questionPayload])}\n`)
               );
             }
           }
@@ -343,7 +369,7 @@ export async function QueryStream(payload: QueryStreamPayload) {
 
               // Stream response payload to browser
               controller.enqueue(
-                encoder.encode(`${JSON.stringify([responsePayload, productsPayload])}||\n`)
+                encoder.encode(`${JSON.stringify([responsePayload, productsPayload])}\n`)
               );
             } else {
               // Send as-is
@@ -359,7 +385,7 @@ export async function QueryStream(payload: QueryStreamPayload) {
 
               // Stream response payload to browser
               controller.enqueue(
-                encoder.encode(`${JSON.stringify([responsePayload])}||\n`)
+                encoder.encode(`${JSON.stringify([responsePayload])}\n`)
               );
             }
           }
