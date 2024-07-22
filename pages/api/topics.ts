@@ -57,8 +57,14 @@ const handler = async (req: Request): Promise<Response> => {
       role: "user",
       content: `List 3 - 5 relevant questions you can answer for me. Provide both the full question and a 2-3 word summary for each.
 
+Here are some examples:
+1. What are some popular art styles for home decor? | Art Styles
+2. Can you recommend famous artists for wall art? | Famous Artists
+3. How can I choose art that complements my home decor? | Home Decor Matching
+4. Where can I purchase art for my walls? | Buying Art
+
 Use the following format:
-#. Question | Summary`
+#. <question> | <summary>`
     });
   } else {
     console.log("Generating suggested user response topics.");
@@ -66,17 +72,17 @@ Use the following format:
     // Add default topic request
     formattedMessages.push({
       role: "user",
-      content: `List 2 - 3 relevant questions I could ask you given the advice above. Provide both the full question and a 2-3 word summary for each.
+      content: `List 2 - 3 relevant questions you can answer for me. Provide both the full question and a 2-3 word summary for each.
 
 Use the following format:
-#. Question | Summary`
+#. <question> | <summary>`
     });
   }
   console.log("Formatted Query: ", formattedMessages);
 
   // Create response stream
   const payload: TopicsStreamPayload = {
-    model: "gpt-3.5-turbo",
+    model: "gpt-4o-mini",
     messages: formattedMessages,
     temperature: 1.0,
     top_p: 1,

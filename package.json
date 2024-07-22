@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev:api": "next dev",
-    "dev:proxy": "local-ssl-proxy --source 3001 --target 3000",
+    "dev:proxy": "local-ssl-proxy --key localhost-key.pem --cert localhost.pem --source 3001 --target 3000",
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:proxy\"",
     "build": "next build",
     "start": "next start"
